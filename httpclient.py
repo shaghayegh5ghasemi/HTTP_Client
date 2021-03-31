@@ -1,6 +1,7 @@
 import requests
 import sys
 import re
+import os.path
 
 url = sys.argv[1]
 method = None
@@ -15,7 +16,7 @@ if re.match(urlvalidation,url) == None:
     exit(0)
 
 for index,argument in enumerate(sys.argv):
-    if(argument == "-M" or argument == "--method"):
+    if argument == "-M" or argument == "--method":
         if sys.argv[index + 1].upper() not in ["GET","POST","PATCH" , "DELETE","PUT"]:
             print("Invalid Method")
             exit(0)
@@ -26,6 +27,7 @@ for index,argument in enumerate(sys.argv):
             temp = i.split(":")
             if temp[0] in headers.keys():
                 print("Pay Attention! Duplicated Headers.")
+                print("*************************************************************")
             headers[temp[0].lower()] = temp[1]
     if argument == "-Q" or argument == "--queries":
         q = sys.argv[index + 1].split("&")
@@ -37,13 +39,31 @@ for index,argument in enumerate(sys.argv):
     if argument == "-D" or argument == "--data":
         if "content-type" not in headers.keys():
             headers["content-type"] = "application/x-www-form-urlencoded"
+        dataValidation = re.compile("([A-Za-z0-9%./]+=[^\s]+)")
+        if re.match(dataValidation,sys.argv[index + 1]) == None:
+            print("Data entered is not in the x-www-form-urlencoded format")
+            print("*************************************************************")
         body = sys.argv[index + 1]
     if argument == "--json":
         if "content-type" not in headers.keys():
             headers["content-type"] = "application/json"
+        dataValidation = re.compile(".+?(?<=\$apples\$)")
+        if re.match(dataValidation,sys.argv[index + 1]) == None:
+            print("Data entered is not in the json format")
+            print("*************************************************************")
         body = sys.argv[index + 1]
     if argument == "--timeout":
         timeout = float(sys.argv[index + 1])
+    if argument == "--file":
+        if "content-type" not in headers.keys():
+            headers["content-type"] = "application/octet-stream"
+        filePath = sys.argv[index + 1]
+        if os.path.isfile(filePath):
+            body = filePath
+        else:
+            print("File does not exist!")
+            print("*************************************************************")
+            exit(0)
         
 
 if(method == None):
@@ -77,6 +97,11 @@ except:
 print("Method           -----> " + method)
 print("Status code      -----> " + str(response.status_code))
 print("Status Massage   -----> " + response.reason)
+print()
 print("Rsponse Headers: ")
 for i in response.request.headers.keys():
     print(i + " >>> " + response.request.headers[i])
+
+print()
+print("Body:")
+print(str(response.content))
