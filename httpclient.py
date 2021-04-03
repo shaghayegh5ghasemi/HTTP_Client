@@ -3,6 +3,7 @@ import sys
 import re
 import os.path
 
+#Parameters
 url = sys.argv[1]
 method = None
 headers = {}
@@ -10,6 +11,8 @@ queries = {}
 body = None
 timeout = 80000
 response = None
+
+#Get the arguments
 urlvalidation = re.compile(r"(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})")
 if re.match(urlvalidation,url) == None:
     print("Invalid UrL")
@@ -47,8 +50,7 @@ for index,argument in enumerate(sys.argv):
     if argument == "--json":
         if "content-type" not in headers.keys():
             headers["content-type"] = "application/json"
-        dataValidation = re.compile(".+?(?<=\$apples\$)")
-        if re.match(dataValidation,sys.argv[index + 1]) == None:
+        if sys.argv[index + 1][0] != "{" or sys.argv[index + 1][-1] != "}" or ":" not in sys.argv[index + 1]:
             print("Data entered is not in the json format")
             print("*************************************************************")
         body = sys.argv[index + 1]
@@ -59,7 +61,8 @@ for index,argument in enumerate(sys.argv):
             headers["content-type"] = "application/octet-stream"
         filePath = sys.argv[index + 1]
         if os.path.isfile(filePath):
-            body = filePath
+            fileContent = open(filePath, "rb")
+            body = fileContent.read()
         else:
             print("File does not exist!")
             print("*************************************************************")
@@ -68,23 +71,51 @@ for index,argument in enumerate(sys.argv):
 
 if(method == None):
     method = "GET"
-
+   
+#Send the request
 try:
     if(method=="GET"):
-        response = requests.get(url, params=queries, headers=headers, timeout=timeout)
-
+        response = requests.get(url, params=queries, headers=headers, timeout=timeout, data=body, stream=True)
+        
     if(method=="POST"):
-        response = requests.post(url, params=queries, headers=headers, timeout=timeout, data=body)
+        response = requests.post(url, params=queries, headers=headers, timeout=timeout, data=body, stream=True)
         
     if(method=="PUT"):
-        response = requests.put(url, params=queries, headers=headers, timeout=timeout, data=body)
+        response = requests.put(url, params=queries, headers=headers, timeout=timeout, data=body, stream=True)
             
-
     if(method=="PATCH"):
-        response = requests.patch(url, params=queries, headers=headers, timeout=timeout, data=body)
+        response = requests.patch(url, params=queries, headers=headers, timeout=timeout, data=body, stream=True)
 
     if(method=="DELETE"):
-        response = requests.delete(url, params=queries, headers=headers, timeout=timeout)
+        response = requests.delete(url, params=queries, headers=headers, timeout=timeout, data= body, stream=True)
+
+    #print the result
+    print("Method           -----> " + method)
+    print("Status code      -----> " + str(response.status_code))
+    print("Status Massage   -----> " + response.reason)
+    print()
+    print("Rsponse Headers: ")
+    for i in response.request.headers.keys():
+        print(i + " >>> " + response.request.headers[i])
+
+    if response.headers['content-type'] in ["image/jpeg", "image/png", "video/ogg", "application/pdf", "application/octet-stream"]:
+        file_type = response.url.split(".")
+        file_name = "downloaded_file." + file_type[-1]
+        myfile = open(file_name, "wb")
+        total_size= int(response.headers.get('content-length', 0))
+        block_size = 1024
+        temp = 0
+        for data in response.iter_content(block_size):
+            myfile.write(data)
+            temp += len(data)
+            percent = (temp/total_size)*100
+            print(int(percent), "%", end="\r")
+        print("100")
+        print("File name is: ", file_name)
+    else:
+        print()
+        print("Body:")
+        print(response.text)
 
 except requests.exceptions.ConnectTimeout:
         print("Connection timed out")
@@ -93,15 +124,3 @@ except:
     print("Server is unavailable!")
     exit(0)
 
-#print the result
-print("Method           -----> " + method)
-print("Status code      -----> " + str(response.status_code))
-print("Status Massage   -----> " + response.reason)
-print()
-print("Rsponse Headers: ")
-for i in response.request.headers.keys():
-    print(i + " >>> " + response.request.headers[i])
-
-print()
-print("Body:")
-print(str(response.content))
